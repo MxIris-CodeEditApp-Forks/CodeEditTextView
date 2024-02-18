@@ -313,12 +313,15 @@ public class TextView: NSView, NSTextContent {
 
     open override func becomeFirstResponder() -> Bool {
         isFirstResponder = true
+        selectionManager.cursorTimer.resetTimer()
+        needsDisplay = true
         return super.becomeFirstResponder()
     }
 
     open override func resignFirstResponder() -> Bool {
         isFirstResponder = false
         selectionManager.removeCursors()
+        needsDisplay = true
         return super.resignFirstResponder()
     }
 
