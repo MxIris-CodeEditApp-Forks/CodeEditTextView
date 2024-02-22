@@ -54,6 +54,17 @@ public class TextLayoutManager: NSObject {
         }
     }
 
+    /// The amount of extra vertical padding used to lay out lines in before they come into view.
+    ///
+    /// This solves a small problem with layout performance, if you're seeing layout lagging behind while scrolling,
+    /// adjusting this value higher may help fix that.
+    /// Defaults to `350`.
+    public var verticalLayoutPadding: CGFloat = 350 {
+        didSet {
+            setNeedsLayout()
+        }
+    }
+
     // MARK: - Internal
 
     weak var textStorage: NSTextStorage?
@@ -215,10 +226,12 @@ public class TextLayoutManager: NSObject {
     }
 
     /// Ends a transaction. When called, the layout manager will layout any necessary lines.
-    public func endTransaction() {
+    public func endTransaction(forceLayout: Bool = false) {
         transactionCounter -= 1
         if transactionCounter == 0 {
-            setNeedsLayout()
+            if forceLayout {
+                setNeedsLayout()
+            }
             layoutLines()
         } else if transactionCounter < 0 {
             // swiftlint:disable:next line_length
@@ -230,10 +243,15 @@ public class TextLayoutManager: NSObject {
 
     /// Lays out all visible lines
     func layoutLines() { // swiftlint:disable:this function_body_length
-        guard let visibleRect = delegate?.visibleRect, !isInTransaction, let textStorage else { return }
+        guard layoutView?.superview != nil,
+              let visibleRect = delegate?.visibleRect,
+              !isInTransaction,
+              let textStorage else {
+            return
+        }
         CATransaction.begin()
-        let minY = max(visibleRect.minY, 0)
-        let maxY = max(visibleRect.maxY, 0)
+        let minY = max(visibleRect.minY - verticalLayoutPadding, 0)
+        let maxY = max(visibleRect.maxY + verticalLayoutPadding, 0)
         let originalHeight = lineStorage.height
         var usedFragmentIDs = Set<UUID>()
         var forceLayout: Bool = needsLayout
@@ -278,6 +296,8 @@ public class TextLayoutManager: NSObject {
             newVisibleLines.insert(linePosition.data.id)
         }
 
+        CATransaction.commit()
+
         // Enqueue any lines not used in this layout pass.
         viewReuseQueue.enqueueViews(notInSet: usedFragmentIDs)
 
@@ -297,7 +317,6 @@ public class TextLayoutManager: NSObject {
         }
 
         needsLayout = false
-        CATransaction.commit()
     }
 
     /// Lays out a single text line.
